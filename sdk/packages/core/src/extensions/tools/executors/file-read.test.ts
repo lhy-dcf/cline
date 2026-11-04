@@ -403,4 +403,39 @@ describe("createFileReadExecutor", () => {
 			await fs.rm(dir, { recursive: true, force: true });
 		}
 	});
+
+	it("still reads an empty file as empty", async () => {
+		const dir = await fs.mkdtemp(path.join(os.tmpdir(), "agents-file-read-"));
+		const filePath = path.join(dir, "empty.txt");
+		await fs.writeFile(filePath, "", "utf-8");
+		const reader = createFileReadExecutor();
+
+		try {
+			await expect(
+				reader({ path: filePath }, { agentId: "agent", iteration: 1 }),
+			).resolves.toBe("");
+		} finally {
+			await fs.rm(dir, { recursive: true, force: true });
+		}
+	});
+
+	it("reports a start_line past the end of the file instead of an empty read", async () => {
+		const dir = await fs.mkdtemp(path.join(os.tmpdir(), "agents-file-read-"));
+		const filePath = path.join(dir, "example.txt");
+		await fs.writeFile(filePath, "one\ntwo\nthree", "utf-8");
+		const reader = createFileReadExecutor();
+
+		try {
+			await expect(
+				reader(
+					{ path: filePath, start_line: 10, end_line: 20 },
+					{ agentId: "agent", iteration: 1 },
+				),
+			).rejects.toThrow(
+				"start_line 10 is beyond the end of the file (3 lines)",
+			);
+		} finally {
+			await fs.rm(dir, { recursive: true, force: true });
+		}
+	});
 });

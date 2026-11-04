@@ -174,6 +174,18 @@ async function readTextWindow(
 		.join("\n");
 	const lastCapturedLine = captured[captured.length - 1]?.lineNumber;
 	if (lastCapturedLine === undefined) {
+		// Nothing captured is only a valid answer for an empty file. A window
+		// that starts past the last line would otherwise read as an empty file,
+		// which the model cannot tell apart from a real one.
+		if (
+			!approximateTotalLines &&
+			totalLines > 0 &&
+			totalLines < requestedStartLine
+		) {
+			throw new Error(
+				`start_line ${requestedStartLine} is beyond the end of the file (${totalLines} lines). Use start_line/end_line within 1-${totalLines}.`,
+			);
+		}
 		return body;
 	}
 
