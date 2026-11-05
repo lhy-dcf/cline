@@ -122,8 +122,12 @@ export function flattenToolResultContent(
 					return `<file path="${block.path}">\n${block.content}\n</file>`;
 				case "image":
 					return `[image:${block.mediaType}]`;
-				default:
-					return "";
+				default: {
+					// Structured tool outputs (Cline ToolOperationResult, web_search_result)
+					// are persisted as arrays of objects that carry no `type` discriminator.
+					// Dropping them told the summarizer the command returned nothing.
+					return truncateText(JSON.stringify(block), TOOL_RESULT_CHAR_LIMIT);
+				}
 			}
 		})
 		.join("\n");
