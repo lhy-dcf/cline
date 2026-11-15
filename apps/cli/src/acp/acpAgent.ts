@@ -4,7 +4,6 @@ import type {
 	AuthenticateRequest,
 	AuthenticateResponse,
 	CancelNotification,
-	ContentBlock,
 	InitializeRequest,
 	InitializeResponse,
 	LoadSessionRequest,
@@ -50,6 +49,10 @@ import {
 } from "./auth";
 import { AUTO_APPROVE_CONFIG_ID, parseAutoApproveValue } from "./auto-approve";
 import { buildConfigOptions } from "./config-options";
+import {
+	extractImageDataUrlsFromContentBlocks,
+	extractTextFromContentBlocks,
+} from "./content-blocks";
 import {
 	buildOrganizationConfigOption,
 	fetchClineOrganizations,
@@ -332,7 +335,11 @@ export class AcpAgent implements Agent {
 		}
 
 		const promptText = extractTextFromContentBlocks(params.prompt);
-		if (!promptText) {
+		// `initialize` advertises `promptCapabilities.image`, so image blocks have to
+		// reach the model. Dropping them here made that capability a lie: the agent
+		// ran without the image and the client was never told.
+		const userImages = extractImageDataUrlsFromContentBlocks(params.prompt);
+		if (!promptText && userImages.length === 0) {
 			return { stopReason: "end_turn" };
 		}
 
@@ -375,6 +382,7 @@ export class AcpAgent implements Agent {
 			const result = await sessionManager.send({
 				sessionId: activeSessionId,
 				prompt: promptText,
+				userImages: userImages.length > 0 ? userImages : undefined,
 			});
 
 			if (result) {
@@ -889,13 +897,6 @@ async function buildAllConfigOptions(
 		autoApproveTools: session.autoApproveTools,
 		organizationOption,
 	});
-}
-
-function extractTextFromContentBlocks(blocks: ContentBlock[]): string {
-	return blocks
-		.filter((b): b is ContentBlock & { type: "text" } => b.type === "text")
-		.map((b) => b.text)
-		.join("\n");
 }
 
 function mapFinishReason(reason: string): StopReason {
